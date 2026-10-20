@@ -1,0 +1,441 @@
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>羽球臨打記帳</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f1f5f9;color:#172033;font-family:Arial,"Noto Sans TC",sans-serif}
+header{background:#123b36;color:white;padding:25px 18px}
+header h1{margin:0 0 8px}
+header p{margin:0;color:#c9e5dc}
+main{max-width:1100px;margin:20px auto;padding:0 14px 40px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.card{background:white;border-radius:14px;padding:18px;box-shadow:0 2px 9px #00000008;margin-bottom:16px}
+.stat-label{color:#64748b;font-size:13px}
+.stat-value{font-size:24px;font-weight:bold;margin-top:9px;overflow-wrap:anywhere}
+.green{color:#07805e}.red{color:#dc2626}
+.layout{display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px;align-items:start}
+h2{font-size:19px;margin:0 0 16px}
+label{display:block;font-size:13px;margin:12px 0 6px;font-weight:bold;color:#475569}
+input,select{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:8px;background:white;font-size:15px}
+button{padding:10px 13px;border:0;border-radius:8px;cursor:pointer;font-weight:bold;font-size:14px}
+.primary{background:#0f766e;color:white;width:100%;margin-top:15px}
+.secondary{background:#e2e8f0;color:#1e293b}
+.danger{background:#fee2e2;color:#b91c1c}
+.filters{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:15px}
+.table-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:750px}
+th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+th{background:#f8fafc;color:#64748b}
+.tag{background:#dbeafe;color:#1d4ed8;padding:4px 7px;border-radius:20px}
+.summary{display:flex;justify-content:space-between;gap:8px;margin:15px 0;font-size:13px;flex-wrap:wrap}
+.group-row{padding:12px 0;border-bottom:1px solid #e2e8f0;font-size:13px}
+.group-row strong{display:block;margin-bottom:5px}
+.hint{color:#64748b;font-size:12px;line-height:1.7}
+@media(max-width:760px){
+ .layout{grid-template-columns:1fr}
+ .stats{grid-template-columns:1fr}
+ .filters{grid-template-columns:1fr 1fr}
+ .stat-value{font-size:22px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏸 羽球臨打記帳</h1>
+  <p>每場收支清楚記錄，掌握每個臨打團的獲利。</p>
+</header>
+
+<main>
+  <section class="stats">
+    <div class="card">
+      <div class="stat-label">本月總營收</div>
+      <div class="stat-value" id="totalRevenue">NT$ 0</div>
+    </div>
+    <div class="card">
+      <div class="stat-label">本月總成本</div>
+      <div class="stat-value" id="totalCost">NT$ 0</div>
+    </div>
+    <div class="card">
+      <div class="stat-label">本月淨利潤</div>
+      <div class="stat-value green" id="totalProfit">NT$ 0</div>
+    </div>
+  </section>
+
+  <div class="layout">
+    <section class="card">
+      <h2 id="formTitle">新增臨打場次</h2>
+      <form id="entryForm">
+        <label for="date">日期</label>
+        <input id="date" type="date" required>
+
+        <label for="time">開始時間</label>
+        <input id="time" type="time" value="09:00" required>
+
+        <label for="period">上午／下午（自動判斷）</label>
+        <input id="period" readonly>
+
+        <label for="group">臨打星期（自動判斷）</label>
+        <input id="group" readonly>
+
+        <label for="revenue">營收（元）</label>
+        <input id="revenue" type="number" min="0" step="1" placeholder="例如：3600" required>
+
+        <label for="shuttle">用球成本（元）</label>
+        <input id="shuttle" type="number" min="0" step="1" value="0" required>
+
+        <label for="court">場地成本（元）</label>
+        <input id="court" type="number" min="0" step="1" value="0" required>
+
+        <label for="note">備註（選填）</label>
+        <input id="note" maxlength="100" placeholder="例如：三面場、加開場">
+
+        <div class="card" style="margin-top:15px;background:#f8fafc">
+          <div class="stat-label">本場淨利潤</div>
+          <div class="stat-value green" id="preview">NT$ 0</div>
+        </div>
+
+        <button class="primary" type="submit" id="saveButton">儲存場次</button>
+        <button class="secondary" type="button" style="width:100%;margin-top:8px" onclick="resetForm()">清空表單</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>📊 場次紀錄</h2>
+
+      <div class="filters">
+        <div>
+          <label for="monthFilter">月份</label>
+          <input type="month" id="monthFilter">
+        </div>
+        <div>
+          <label for="dayFilter">星期</label>
+          <select id="dayFilter">
+            <option value="全部">全部</option>
+            <option>週二</option><option>週五</option>
+            <option>週六</option><option>週日</option>
+          </select>
+        </div>
+        <div>
+          <label for="periodFilter">時段</label>
+          <select id="periodFilter">
+            <option value="全部">上午＋下午</option>
+            <option>上午</option><option>下午</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>日期／時間</th>
+              <th>臨打團</th>
+              <th>營收</th>
+              <th>用球</th>
+              <th>場地</th>
+              <th>淨利</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="records"></tbody>
+        </table>
+      </div>
+
+      <div class="summary">
+        <span id="count">共 0 場</span>
+        <strong id="filteredProfit">篩選淨利：NT$ 0</strong>
+      </div>
+
+      <h2 style="margin-top:25px">📅 各臨打團獲利</h2>
+      <div id="groupStats"></div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px">
+        <button class="secondary" onclick="exportCSV()">匯出 CSV 備份</button>
+        <button class="secondary" onclick="importFile.click()">匯入 CSV</button>
+        <input id="importFile" type="file" accept=".csv,text/csv" hidden>
+      </div>
+      <p class="hint">
+        資料預設存在目前瀏覽器。請定期匯出備份。不同裝置不會自動同步。
+      </p>
+    </section>
+  </div>
+</main>
+
+<script>
+const KEY = "badminton_dropin_v2";
+const $ = id => document.getElementById(id);
+const dayNames = ["週日","週一","週二","週三","週四","週五","週六"];
+const allowed = ["週二","週五","週六","週日"];
+let data = [];
+let editingId = null;
+
+try {
+  const saved = JSON.parse(localStorage.getItem(KEY) || "[]");
+  data = Array.isArray(saved) ? saved : [];
+} catch(e) { data = []; }
+
+function money(n) {
+  return "NT$ " + Math.round(n || 0).toLocaleString("zh-TW");
+}
+function profit(x) {
+  return Number(x.revenue) - Number(x.shuttle) - Number(x.court);
+}
+function periodOf(time) {
+  return Number(time.split(":")[0]) < 12 ? "上午" : "下午";
+}
+function getDay(date) {
+  return dayNames[new Date(date + "T12:00:00").getDay()];
+}
+function updateClassification() {
+  const date = $("date").value;
+  const time = $("time").value;
+  if (!date || !time) return;
+  const day = getDay(date);
+  $("group").value = allowed.includes(day) ? day + "臨打" : day + "（非固定臨打日）";
+  $("period").value = periodOf(time);
+  updatePreview();
+}
+function updatePreview() {
+  const p = (Number($("revenue").value)||0)
+    - (Number($("shuttle").value)||0)
+    - (Number($("court").value)||0);
+  $("preview").textContent = money(p);
+  $("preview").className = "stat-value " + (p < 0 ? "red" : "green");
+}
+function save() {
+  localStorage.setItem(KEY, JSON.stringify(data));
+}
+function resetForm() {
+  editingId = null;
+  $("entryForm").reset();
+  $("date").value = localDate();
+  $("time").value = "09:00";
+  $("shuttle").value = 0;
+  $("court").value = 0;
+  $("formTitle").textContent = "新增臨打場次";
+  $("saveButton").textContent = "儲存場次";
+  updateClassification();
+}
+function localDate() {
+  const d = new Date();
+  return d.getFullYear() + "-" +
+    String(d.getMonth()+1).padStart(2,"0") + "-" +
+    String(d.getDate()).padStart(2,"0");
+}
+function sum(items, key) {
+  return items.reduce((s,x)=>s+Number(x[key]||0),0);
+}
+
+$("date").addEventListener("change", updateClassification);
+$("time").addEventListener("change", updateClassification);
+["revenue","shuttle","court"].forEach(id =>
+  $(id).addEventListener("input", updatePreview)
+);
+
+$("entryForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const date = $("date").value;
+  const time = $("time").value;
+  const day = getDay(date);
+
+  if (!allowed.includes(day)) {
+    if (!confirm("這一天不是週二、週五、週六或週日，仍要儲存嗎？")) return;
+  }
+
+  const item = {
+    id: editingId || String(Date.now()),
+    date, time,
+    period: periodOf(time),
+    group: day,
+    revenue: Number($("revenue").value),
+    shuttle: Number($("shuttle").value),
+    court: Number($("court").value),
+    note: $("note").value.trim()
+  };
+
+  if (editingId) {
+    data = data.map(x => x.id === editingId ? item : x);
+  } else {
+    data.push(item);
+  }
+
+  save();
+  $("monthFilter").value = date.slice(0,7);
+  render();
+  resetForm();
+});
+
+function editEntry(id) {
+  const x = data.find(a => a.id === id);
+  if (!x) return;
+  editingId = id;
+  $("date").value = x.date;
+  $("time").value = x.time;
+  $("revenue").value = x.revenue;
+  $("shuttle").value = x.shuttle;
+  $("court").value = x.court;
+  $("note").value = x.note || "";
+  $("formTitle").textContent = "編輯臨打場次";
+  $("saveButton").textContent = "更新場次";
+  updateClassification();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function deleteEntry(id) {
+  if (!confirm("確定刪除這筆紀錄？")) return;
+  data = data.filter(x => x.id !== id);
+  save();
+  render();
+}
+
+function render() {
+  const month = $("monthFilter").value;
+  const day = $("dayFilter").value;
+  const period = $("periodFilter").value;
+
+  const monthItems = data.filter(x => !month || x.date.startsWith(month));
+  const filtered = monthItems.filter(x =>
+    (day === "全部" || x.group === day) &&
+    (period === "全部" || x.period === period)
+  ).sort((a,b) => (b.date+b.time).localeCompare(a.date+a.time));
+
+  const revenue = sum(monthItems,"revenue");
+  const cost = sum(monthItems,"shuttle") + sum(monthItems,"court");
+  const p = revenue-cost;
+
+  $("totalRevenue").textContent = money(revenue);
+  $("totalCost").textContent = money(cost);
+  $("totalProfit").textContent = money(p);
+  $("totalProfit").className = "stat-value " + (p<0?"red":"green");
+
+  $("count").textContent = "共 " + filtered.length + " 場";
+  $("filteredProfit").textContent =
+    "篩選淨利：" + money(filtered.reduce((s,x)=>s+profit(x),0));
+
+  const tbody = $("records");
+  tbody.replaceChildren();
+
+  if (!filtered.length) {
+    const tr = tbody.insertRow();
+    const td = tr.insertCell();
+    td.colSpan = 7;
+    td.textContent = "目前沒有紀錄";
+    td.style.textAlign = "center";
+    td.style.padding = "25px";
+  }
+
+  filtered.forEach(x => {
+    const tr = tbody.insertRow();
+    const values = [
+      x.date + " " + x.time,
+      x.group + " " + x.period,
+      money(x.revenue), money(x.shuttle),
+      money(x.court), money(profit(x))
+    ];
+    values.forEach((v,i) => {
+      const td = tr.insertCell();
+      td.textContent = v;
+      if (i===5) td.style.color = profit(x)<0 ? "#dc2626" : "#07805e";
+    });
+
+    const td = tr.insertCell();
+    const edit = document.createElement("button");
+    edit.textContent = "編輯";
+    edit.className = "secondary";
+    edit.onclick = () => editEntry(x.id);
+
+    const del = document.createElement("button");
+    del.textContent = "刪除";
+    del.className = "danger";
+    del.style.marginLeft = "4px";
+    del.onclick = () => deleteEntry(x.id);
+    td.append(edit,del);
+  });
+
+  $("groupStats").replaceChildren();
+  ["週二","週五","週六","週日"].forEach(g => {
+    const xs = monthItems.filter(x => x.group === g);
+    const rev = sum(xs,"revenue");
+    const c = sum(xs,"shuttle")+sum(xs,"court");
+    const d = document.createElement("div");
+    d.className = "group-row";
+    const title = document.createElement("strong");
+    title.textContent = g + "臨打｜" + xs.length + " 場";
+    const detail = document.createElement("span");
+    detail.textContent = "營收 " + money(rev) +
+      "｜成本 " + money(c) + "｜淨利 " + money(rev-c);
+    detail.style.color = rev-c<0 ? "#dc2626" : "#07805e";
+    d.append(title,detail);
+    $("groupStats").append(d);
+  });
+}
+
+["monthFilter","dayFilter","periodFilter"].forEach(id =>
+  $(id).addEventListener("change",render)
+);
+
+function exportCSV() {
+  const rows = [
+    ["日期","開始時間","星期","時段","營收","用球成本","場地成本","淨利潤","備註"],
+    ...data.map(x=>[x.date,x.time,x.group,x.period,x.revenue,x.shuttle,x.court,profit(x),x.note||""])
+  ];
+  const csv = "\ufeff" + rows.map(row =>
+    row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")
+  ).join("\r\n");
+  const blob = new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "羽球臨打帳目.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+$("importFile").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const text = (await file.text()).replace(/^\uFEFF/,"");
+    const lines = text.trim().split(/\r?\n/);
+    const parse = line => {
+      const result = [];
+      let field="",quoted=false;
+      for(let i=0;i<line.length;i++){
+        const c=line[i];
+        if(c==='"' && quoted && line[i+1]==='"'){field+='"';i++}
+        else if(c==='"') quoted=!quoted;
+        else if(c===',' && !quoted){result.push(field);field=""}
+        else field+=c;
+      }
+      result.push(field);
+      return result;
+    };
+    const rows = lines.slice(1).map(parse).filter(r=>r.length>=7);
+    const imported = rows.map(r=>({
+      id:String(Date.now())+Math.random().toString(36).slice(2),
+      date:r[0],time:r[1]||"09:00",
+      group:r[2]||getDay(r[0]),
+      period:r[3]||periodOf(r[1]||"09:00"),
+      revenue:Number(r[4])||0,shuttle:Number(r[5])||0,
+      court:Number(r[6])||0,note:r[8]||""
+    })).filter(x=>x.date && /^\d{4}-\d{2}-\d{2}$/.test(x.date));
+    if(confirm("匯入 "+imported.length+" 筆資料？現有紀錄會保留。")){
+      data.push(...imported);
+      save();render();
+    }
+  } catch(err) {
+    alert("匯入失敗，請確認 CSV 格式。");
+  }
+  e.target.value="";
+});
+
+$("monthFilter").value = localDate().slice(0,7);
+resetForm();
+render();
+</script>
+</body>
+</html>
